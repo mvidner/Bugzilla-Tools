@@ -1,0 +1,46 @@
+#! /bin/sh
+# bnc_curl: call curl after authenticating with iChain at bugzilla.novell.com
+# author: http://en.opensuse.org/User:Mvidner
+#
+# usage:
+# bnc_curl "https://bugzilla.novell.com/show_bug.cgi?id=176013" > bug.html
+# needs a file with "username=foo&password=bar"
+
+# exit on errors
+set -o errexit
+
+# encode args as %hex to hide passwords from passers by
+percentize() {
+    echo "$@" | perl -p -e 's/(.)/sprintf("%%%02x",ord $1)/eg'
+}
+
+# file with credentials
+CREDSFILE=$HOME/.bnc.creds
+if [ "$1" == "--install" ]; then
+    echo -n "Bugzilla.Novell.com username (not email): "
+    read USERNAME
+    echo -n "Bugzilla.Novell.com password (no echo): "
+    stty -echo; read PASSWORD; echo; stty echo
+    echo "username=$(percentize $USERNAME)&password=$(percentize $PASSWORD)" > $CREDSFILE
+    chmod 600 $CREDSFILE
+    exit
+fi
+
+if ! test -r $CREDSFILE; then
+    echo >&2 "Cannot read credentials from $CREDSFILE."
+    echo >&2 "Call $0 --install to create it."
+    exit 1
+fi
+
+ICHAIN="https://bugzilla.novell.com/ICSLogin/auth-up"
+
+# relevant curl options:
+# -b: input cookies (various formats)
+# -c: save cookies in Netscape format
+# -d: pass form data (@ from file)
+
+COOKIEJAR=`mktemp -t bnc_curl_cookiejar_XXXXXX` || exit 1
+trap "rm $COOKIEJAR" EXIT INT TERM
+
+curl -c $COOKIEJAR -d @$CREDSFILE "$ICHAIN" >&2
+curl -b $COOKIEJAR "$@"
