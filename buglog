@@ -1,0 +1,76 @@
+#! /bin/sh
+# automatic saving of logs from Novell Bugzilla
+# http://en.opensuse.org/User:Mvidner
+# v 0.4, using bnc_curl, checking URL
+
+set -o errexit
+
+: ${BUGLOG_DIR=$HOME/logs}
+
+# if stdout is not a terminal, open one
+if [ "$1" == "-n" ]; then
+    shift
+else
+    test -t 1 || exec xterm -e "$0" "$@"
+fi
+
+if [ "$1" == "--install" ]; then
+# enabling this as a konqueror plugin (thanks Seli):
+    cat > ~/.kde/share/apps/konqueror/servicemenus/buglog.desktop <<EOF
+[Desktop Entry]
+Encoding=UTF-8
+ServiceTypes=all/allfiles
+Actions=Buglog
+
+[Desktop Action Buglog]
+Name=Copy Bugzilla log
+Exec=buglog %u
+Icon=text-editor
+EOF
+    echo "Konqueror plugin reistered."
+    exit
+fi
+
+# https://bugzilla.novell.com/attachment.cgi?id=72681&action=view
+AU="$1"
+if [ -z "$AU" ]; then
+    echo "usage: buglog https://bugzilla.novell.com/attachment.cgi?id=..."
+    exit 1
+fi
+case "$AU" in
+    *attachment.cgi*) ;;
+    *) echo "Warning, the URL does not seem to point to an attachment" ;;
+esac
+
+AU="${AU%&action=*}"
+AUE="$AU&action=edit"
+
+AEF=`mktemp -t buglog.XXXXXX` || exit
+trap "rm \"$AEF\"" EXIT TERM INT
+
+echo "Reading attachment metadata"
+bnc_curl "$AUE" >"$AEF"
+# <title>Edit Attachment #72681 for Bug #156830</title>
+# update: Attachment 94209 Details for Bug 194106
+BUGNUM=`sed -n 's/.*Attachment .* for Bug #*\([0-9]*\).*/\1/;T;p;q' "$AEF"`
+ATTNUM=`sed -n 's/.*Attachment #*\([0-9]*\).* for Bug #*.*/\1/;T;p;q' "$AEF"`
+# <input ... name="filename" value="NetManager_NSconfScreen.png">
+# 'N' appends next line
+ATTF=`sed -n '/name="filename"/{N;s/.*value="\([^"]*\)".*/\1/;T;p;q;}' "$AEF"`
+
+if [ -z "$BUGNUM" -a -z "$ATTF" ]; then
+    echo "Empty bug number and attachment filename. Skipping."
+else
+    ATTF="${BUGLOG_DIR}/$BUGNUM-$ATTNUM-$ATTF"
+
+    mkdir -p "${BUGLOG_DIR}"
+    echo "Reading attachment data > $ATTF"
+    bnc_curl "$AU" >"$ATTF"
+fi
+
+if test -t 1; then
+    # wait before closing the xterm
+    WAIT=30
+    echo Waiting $WAIT seconds, press Enter to finish now.
+    read -t $WAIT
+fi
