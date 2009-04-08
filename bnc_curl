@@ -38,9 +38,10 @@ ICHAIN="https://bugzilla.novell.com/ICSLogin/auth-up"
 # -b: input cookies (various formats)
 # -c: save cookies in Netscape format
 # -d: pass form data (@ from file)
+# -L: follow redirects
 
 COOKIEJAR=`mktemp -t bnc_curl_cookiejar_XXXXXX` || exit 1
 trap "rm $COOKIEJAR" EXIT INT TERM
 
 curl -c $COOKIEJAR -d @$CREDSFILE "$ICHAIN" >&2
-curl -b $COOKIEJAR "$@"
+curl -L -b $COOKIEJAR "$@"
