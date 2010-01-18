@@ -14,13 +14,29 @@ percentize() {
     echo "$@" | perl -p -e 's/(.)/sprintf("%%%02x",ord $1)/eg'
 }
 
+function read_credentials_from_oscrc() {
+    local _user _pass
+
+    if [ -r $HOME/.oscrc ]; then
+        # read the section [https://api.opensuse.org] from ~/.oscrc and
+        # modify it to the shell evaluable format, results are two variables
+        # USERNAME and PASSWORD
+        eval `grep -A 4 '^\[https://api.opensuse.org/\]' ~/.oscrc | \
+              sed -e 's/[ ]*//g' -e 's/^user=/USERNAME=/' -e 's/pass=/PASSWORD=/' | \
+              grep '^\(USERNAME\|PASSWORD\)='`
+    fi
+}
+
 # file with credentials
 CREDSFILE=$HOME/.bnc.creds
 if [ "$1" == "--install" ]; then
-    echo -n "Bugzilla.Novell.com username (not email): "
-    read USERNAME
-    echo -n "Bugzilla.Novell.com password (no echo): "
-    stty -echo; read PASSWORD; echo; stty echo
+    read_credentials_from_oscrc
+    if [ -z "$USERNAME" -o -z "$PASSWORD" ]; then
+        echo -n "Bugzilla.Novell.com username (not email): "
+        read USERNAME
+        echo -n "Bugzilla.Novell.com password (no echo): "
+        stty -echo; read PASSWORD; echo; stty echo
+    fi
     echo "username=$(percentize $USERNAME)&password=$(percentize $PASSWORD)" > $CREDSFILE
     chmod 600 $CREDSFILE
     exit
