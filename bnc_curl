@@ -27,6 +27,42 @@ function read_credentials_from_oscrc() {
     fi
 }
 
+function get_firefox3_cookies_db() {
+
+    local _foo
+    _foo=`ls -1 ~/.mozilla/firefox/*/cookies.sqlite 2> /dev/null | wc -l`
+
+    case ${_foo} in
+        0)
+            echo "No cookies.sqlite found" > /dev/stderr
+            ;;
+        1)
+            ls -1 ~/.mozilla/firefox/*/cookies.sqlite
+            ;;
+        *)
+            echo "There're multiple Firefox profiles, don't know which one to use" > /dev/stderr
+            ;;
+    esac
+
+}
+
+function read_bnc_cookies_from_firefox3() {
+    local _db _tmpdb _row
+
+    _db=$1
+    [ -r "$_db" ] || exit 2
+
+    _tmpdb=`mktemp bnc_curl_cookies_XXXXXX` || exit 3
+    trap "rm /tmp/bnc_curl_*" EXIT INT TERM
+    cp "$_db" "$_tmpdb"
+
+    sqlite3 "$_tmpdb" 'SELECT * from moz_cookies WHERE host="bugzilla.novell.com";' | while read _row; do
+        # not need to encode string, so plain awk is enough
+        echo "$_row" | awk  -F '|' '{print $4 "\tFALSE\t" $5 "\tTRUE\t" $6 "\t" $2 "\t" $3};'
+    done
+    rm $_tmpdb
+}
+
 # file with credentials
 CREDSFILE=$HOME/.bnc.creds
 if [ "$1" == "--install" ]; then
@@ -57,7 +93,10 @@ ICHAIN="https://bugzilla.novell.com/ICSLogin/auth-up"
 # -L: follow redirects
 
 COOKIEJAR=`mktemp -t bnc_curl_cookiejar_XXXXXX` || exit 1
-trap "rm $COOKIEJAR" EXIT INT TERM
+trap "rm /tmp/bnc_curl_*" EXIT INT TERM
 
 curl -c $COOKIEJAR -d @$CREDSFILE "$ICHAIN" >&2
+if [ -n "`get_firefox3_cookies_db`" ]; then
+    read_bnc_cookies_from_firefox3 `get_firefox3_cookies_db` >> $COOKIEJAR
+fi
 curl -L -b $COOKIEJAR "$@"
