@@ -1,6 +1,8 @@
 #! /bin/sh
 # automatic saving of logs from Novell Bugzilla
-# http://en.opensuse.org/User:Mvidner
+# author: http://en.opensuse.org/User:Mvidner
+# license: GPL v2, see COPYING
+#
 # v 0.4, using bnc_curl, checking URL
 
 set -o errexit

@@ -1,6 +1,7 @@
 #! /bin/sh
 # bnc_curl: call curl after authenticating with iChain at bugzilla.novell.com
 # author: http://en.opensuse.org/User:Mvidner
+# license: GPL v2, see COPYING
 #
 # usage:
 # bnc_curl "https://bugzilla.novell.com/show_bug.cgi?id=176013" > bug.html
