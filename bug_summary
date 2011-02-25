@@ -1,0 +1,37 @@
+#! /usr/bin/env ruby
+# Get a summary of a (Novell) Bugzilla bug
+# in a format suitable for my work log
+#
+# $ bug_summary "https://bugzilla.novell.com/show_bug.cgi?id=672075"
+# 672075 (openSUSE 11.4 Normal P5 Installation) yast-stage2: stray ifcfg file after configuration
+#
+# author: http://en.opensuse.org/User:Mvidner
+# license: GPL v2, see COPYING
+
+require 'tempfile'
+require 'rubygems'
+require 'nokogiri'
+
+FORMAT = '#{bug_id} (#{product} #{bug_severity} #{priority} #{component}) #{short_desc}'
+
+def bug_extract(nokogiri_doc, element_names)
+  hash = {}
+  element_names.each do |e|
+    hash[e] = nokogiri_doc.xpath("/bugzilla/bug/#{e}").first.content
+  end
+  hash
+end
+
+# Exclude the full attachment content!
+# http://bzr.mozilla.org/bugzilla/3.6/annotate/7100/show_bug.cgi
+# Actually it would be better to ask only for what we need. Later.
+bug_url = ARGV[0] + '&ctype=xml&excludefield=attachmentdata'
+
+Tempfile.open "bug_summary_" do |f|
+  system "bnc_curl '#{bug_url}' > #{f.path}" || fail
+  bug_xml = Nokogiri::XML(open f.path)
+  bug = bug_extract bug_xml, %w{bug_id short_desc product component priority bug_severity}
+  bug["priority"].gsub!(/ - .*/, "") # "P5 - None" -> "P5"
+  result = FORMAT.gsub(/\#\{(\w+)\}/) { bug[$1] }
+  puts result
+end
