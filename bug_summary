@@ -32,6 +32,8 @@ Tempfile.open "bug_summary_" do |f|
   bug_xml = Nokogiri::XML(open f.path)
   bug = bug_extract bug_xml, %w{bug_id short_desc product component priority bug_severity}
   bug["priority"].gsub!(/ - .*/, "") # "P5 - None" -> "P5"
+  bug["product"].gsub!(/SUSE Linux Enterprise Server/, "SLES")
+  bug["product"].gsub!(/SUSE Linux Enterprise Desktop/, "SLED")
   result = FORMAT.gsub(/\#\{(\w+)\}/) { bug[$1] }
   puts result
 end
